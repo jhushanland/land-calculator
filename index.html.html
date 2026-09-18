@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>地價差額試算系統（分割 / 合併 / 共有物分割）</title>
+    <style>
+        :root {
+            --primary-color: #1a5f7a;
+            --primary-hover: #154c62;
+            --accent-color: #0088a3;
+            --bg-color: #f4f7f6;
+            --card-bg: #ffffff;
+            --border-color: #dcdfe6;
+            --text-color: #2c3e50;
+            --danger-color: #d9534f;
+            --warning-color: #f0ad4e;
+            --success-color: #5cb85c;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Microsoft JhengHei", sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 8px 8px 0 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        header h1 {
+            font-size: 1.6rem;
+            font-weight: 600;
+        }
+
+        header .subtitle {
+            font-size: 0.9rem;
+            opacity: 0.85;
+            margin-top: 4px;
+        }
+
+        .nav-tabs {
+            display: flex;
+            background-color: #e0e6ed;
+            border-bottom: 2px solid var(--primary-color);
+        }
+
+        .tab-btn {
+            padding: 12px 24px;
+            border: none;
+            background: none;
+            font-size: 1rem;
+            font-weight: bold;
+            color: #555;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .tab-btn:hover {
+            background-color: #d0d7de;
+            color: var(--primary-color);
+        }
+
+        .tab-btn.active {
+            background-color: var(--card-bg);
+            color: var(--primary-color);
+            border-top: 3px solid var(--primary-color);
+        }
+
+        .main-card {
+            background-color: var(--card-bg);
+            padding: 25px;
+            border-radius: 0 0 8px 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            margin-bottom: 25px;
+        }
+
+        .instructions {
+            background-color: #eef6f8;
+            border-left: 4px solid var(--accent-color);
+            padding: 12px 16px;
+            border-radius: 4px;
+            font-size: 0.88rem;
+            margin-bottom: 20px;
+            color: #334e5a;
+        }
+
+        .instructions ul {
+            margin-left: 20px;
+            margin-top: 4px;
+        }
+
+        .tables-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        @media (max-width: 1200px) {
+            .tables-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .table-box {
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            overflow: hidden;
+            background: white;
+        }
+
+        .table-box-header {
+            background-color: #f1f5f8;
+            padding: 10px 15px;
+            font-weight: bold;
+            font-size: 1.05rem;
+            color: var(--primary-color);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* 標題對應頁簽加框粗體樣式 */
+        .title-boxed {
+            display: inline-block;
+            font-weight: 800;
+            color: var(--primary-color);
+            border: 2px solid var(--primary-color);
+            background-color: #eef6f8;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 1.05rem;
+            letter-spacing: 0.5px;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            max-height: 450px;
+            overflow-y: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.88rem;
+            text-align: center;
+        }
+
+        th, td {
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border-color);
+            white-space: nowrap;
+            text-align: center;
+            vertical-align: middle;
+        }
+
+        th {
+            background-color: #fafafa;
+            color: #444;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        /* 取消 Chrome, Safari, Edge, Opera 的數字輸入框上下箭頭 */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        /* 取消 Firefox 的數字輸入框上下箭頭 */
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+
+        /* 通用輸入框基礎樣式 (內部文字預設置中) */
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 0.88rem;
+            text-align: center;
+            transition: border 0.2s;
+        }
+
+        /* 地號輸入框 6 個字元寬 */
+        .input-land {
+            min-width: 6em;
+            width: 6em;
+        }
+
+        /* 面積、公告現值、所有權人欄位 5 個字元寬 */
+        .input-area, .input-value, .input-owner {
+            min-width: 5em;
+            width: 5em;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 2px rgba(0, 136, 163, 0.2);
+        }
+
+        .num-col {
+            text-align: right !important;
+        }
+
+        .readonly-cell {
+            background-color: #f8f9fa;
+            color: #555;
+            font-weight: 500;
+        }
+
+        .btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .btn-danger {
+            background-color: var(--danger-color);
+            color: white;
+            padding: 4px 10px;
+            white-space: nowrap;
+        }
+        .btn-danger:hover {
+            background-color: #c9302c;
+        }
+
+        .btn-outline {
+            background-color: transparent;
+            border: 1px solid var(--primary-color);
+            color: var(--primary-color);
+        }
+        .btn-outline:hover {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .summary-section {
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            overflow: hidden;
+            background: white;
+        }
+
+        .summary-header {
+            background-color: #1a5f7a;
+            color: white;
+            padding: 10px 15px;
+            font-weight: bold;
+            font-size: 1.05rem;
+            text-align: left;
+        }
+
+        .badge-err {
+            background-color: #f2dede;
+            color: #a94442;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: bold;
+            font-size: 0.8rem;
+        }
+
+        .badge-ok {
+            background-color: #dff0d8;
+            color: #3c763d;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.8rem;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            justify-content: flex-end;
+        }
+
+        .fraction-input {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+        /* 持分分子/分母輸入框為 6 個字元寬 */
+        .fraction-input input {
+            width: 6em;
+            min-width: 6em;
+            text-align: center;
+        }
+
+        /* ===== 列印與匯出 PDF 縮放樣式設定 ===== */
+        @page {
+            size: A4 landscape;
+            margin: 8mm;
+        }
+
+        @media print {
+            body {
+                padding: 0;
+                background: white;
+                color: #000;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .container {
+                max-width: 100% !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+
+            header {
+                padding: 10px 15px;
+                background-color: #1a5f7a !important;
+                color: white !important;
+                border-radius: 0;
+            }
+
+            header h1 {
+                font-size: 1.2rem;
+            }
+
+            header .subtitle {
+                font-size: 0.75rem;
+            }
+
+            /* 列印時隱藏不需要的介面與刪除筆數欄 */
+            .toolbar, .btn, .nav-tabs, .instructions, th.col-action, td.col-action {
+                display: none !important;
+            }
+
+            .main-card {
+                box-shadow: none;
+                padding: 0;
+                margin: 0;
+                background: transparent;
+            }
+
+            .tables-grid {
+                display: grid !important;
+                grid-template-columns: 1fr 1fr !important;
+                gap: 10px !important;
+                margin-bottom: 10px !important;
+            }
+
+            .table-box {
+                border: 1px solid #999;
+                border-radius: 0;
+            }
+
+            .table-box-header {
+                padding: 5px 8px;
+                font-size: 0.9rem;
+                background-color: #eaeaea !important;
+            }
+
+            .title-boxed {
+                border: 1.5px solid #1a5f7a !important;
+                padding: 2px 6px !important;
+                font-size: 0.85rem !important;
+            }
+
+            .table-wrapper {
+                max-height: none !important;
+                overflow: visible !important;
+            }
+
+            table {
+                width: 100% !important;
+                font-size: 0.75rem !important;
+                table-layout: fixed;
+            }
+
+            th, td {
+                padding: 4px 5px !important;
+                border: 1px solid #ccc !important;
+                min-width: 0 !important;
+                white-space: normal !important;
+                word-break: break-all;
+                text-align: center !important;
+            }
+
+            .num-col {
+                text-align: right !important;
+            }
+
+            /* 列印時輸入框取消樣式並自動縮放填滿欄位 */
+            input[type="text"], input[type="number"] {
+                border: none !important;
+                background: transparent !important;
+                padding: 0 !important;
+                font-size: 0.75rem !important;
+                width: 100% !important;
+                min-width: 0 !important;
+                box-shadow: none !important;
+                text-align: center !important;
+            }
+
+            .fraction-input input {
+                width: 45% !important;
+                min-width: 0 !important;
+            }
+
+            .summary-section {
+                border: 1px solid #999;
+                border-radius: 0;
+                margin-top: 5px;
+            }
+
+            .summary-header {
+                padding: 5px 8px;
+                font-size: 0.9rem;
+                background-color: #1a5f7a !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <div>
+            <h1>土地分割 / 合併 / 共有物分割 地價差額試算系統</h1>
+            <div class="subtitle">自動計算分割與合併前後所有權人權利價值差額與檢核</div>
+        </div>
+        <button class="btn btn-outline" style="color:white; border-color:white;" onclick="window.print()">列印 / 匯出PDF</button>
+    </header>
+
+    <div class="nav-tabs">
+        <button class="tab-btn active" onclick="switchTab('split')">土地分割試算</button>
+        <button class="tab-btn" onclick="switchTab('merge')">土地合併試算</button>
+        <button class="tab-btn" onclick="switchTab('partition')">共有物分割試算</button>
+    </div>
+
+    <div class="main-card">
+        <div class="instructions">
+            <strong>💡 使用說明與填寫須知：</strong>
+            <ul>
+                <li><strong>分割/合併前：</strong>請輸入地號、土地面積、公告現值及各所有權人持分分子/分母。同一筆土地有多個所有權人時，請新增同行資料並保留地號、面積、現值一致。</li>
+                <li><strong>分割/合併後：</strong>填寫變更後的各地號持分狀況。系統將自動即時算出權利價值、持分檢核（總合是否為1）與所有權人對應。</li>
+                <li><strong>權利價值總覽：</strong>最下方表格將自動匯總各所有權人在分割前後的權利價值差額，並依規定檢核「差額是否逾1平方公尺公告現值」。</li>
+            </ul>
+        </div>
+
+        <div class="tables-grid">
+            <!-- 前表格 -->
+            <div class="table-box">
+                <div class="table-box-header">
+                    <span id="title-before" class="title-boxed">土地分割【前】</span>
+                    <button class="btn btn-primary" onclick="addRow('before')">＋ 新增筆數</button>
+                </div>
+                <div class="table-wrapper">
+                    <table id="table-before">
+                        <thead>
+                            <tr>
+                                <th style="min-width: 6em; width: 13%;">地號</th>
+                                <th style="min-width: 5em; width: 11%;">面積(㎡)</th>
+                                <th style="min-width: 5em; width: 11%;">公告現值</th>
+                                <th style="min-width: 5em; width: 11%;">所有權人</th>
+                                <th style="min-width: 14em; width: 22%;">持分(分子/分母)</th>
+                                <th style="min-width: 8em; width: 14%;" class="num-col">權利價值</th>
+                                <th style="min-width: 6em; width: 10%;">持分檢核</th>
+                                <th style="min-width: 60px; width: 8%;" class="col-action">刪除筆數</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- 動態生成 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 後表格 -->
+            <div class="table-box">
+                <div class="table-box-header">
+                    <span id="title-after" class="title-boxed">土地分割【後】</span>
+                    <button class="btn btn-primary" onclick="addRow('after')">＋ 新增筆數</button>
+                </div>
+                <div class="table-wrapper">
+                    <table id="table-after">
+                        <thead>
+                            <tr>
+                                <th style="min-width: 6em; width: 13%;">地號</th>
+                                <th style="min-width: 5em; width: 11%;">面積(㎡)</th>
+                                <th style="min-width: 5em; width: 11%;">公告現值</th>
+                                <th style="min-width: 5em; width: 11%;">所有權人</th>
+                                <th style="min-width: 14em; width: 22%;">持分(分子/分母)</th>
+                                <th style="min-width: 8em; width: 14%;" class="num-col">權利價值</th>
+                                <th style="min-width: 6em; width: 10%;">持分檢核</th>
+                                <th style="min-width: 60px; width: 8%;" class="col-action">刪除筆數</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- 動態生成 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 權利價值差額匯總表 -->
+        <div class="summary-section">
+            <div class="summary-header">權利價值與地價差額分析</div>
+            <div class="table-wrapper">
+                <table id="table-summary">
+                    <thead>
+                        <tr>
+                            <th style="width: 50px; text-align: center;">項次</th>
+                            <th style="text-align: center;">所有權人</th>
+                            <th class="num-col">分割／合併前權利價值</th>
+                            <th class="num-col">分割／合併後權利價值</th>
+                            <th class="num-col">差額 (後 - 前)</th>
+                            <th style="text-align: center;">逾1平方公尺公告現值檢核</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- 動態生成 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="toolbar">
+            <button class="btn btn-outline" onclick="loadSampleData()">載入範例資料</button>
+            <button class="btn btn-outline" onclick="clearAllData()">清空資料</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 頁簽名稱對應表
+    const tabTitles = {
+        split: '土地分割',
+        merge: '土地合併',
+        partition: '共有物分割'
+    };
+
+    // 預設資料集 (範例) - 已去識別化處理
+    const samples = {
+        split: {
+            before: [
+                { land: '0001', area: 1000, value: 360, owner: '王○明', num: 2, den: 5 },
+                { land: '0001', area: 1000, value: 360, owner: '陳○華', num: 2, den: 5 },
+                { land: '0001', area: 1000, value: 360, owner: '張○同', num: 1, den: 5 },
+                { land: '0002', area: 600, value: 1300, owner: '王○明', num: 1, den: 6 },
+                { land: '0002', area: 600, value: 1300, owner: '陳○華', num: 3, den: 6 },
+                { land: '0002', area: 600, value: 1300, owner: '張○同', num: 2, den: 6 }
+            ],
+            after: [
+                { land: '001-A', area: 600, value: 360, owner: '陳○華', num: 2, den: 3 },
+                { land: '001-A', area: 600, value: 360, owner: '張○同', num: 1, den: 3 },
+                { land: '001-B', area: 400, value: 360, owner: '王○明', num: 1, den: 1 },
+                { land: '002-A', area: 100, value: 1300, owner: '王○明', num: 1, den: 1 },
+                { land: '002-B', area: 500, value: 1300, owner: '陳○華', num: 3, den: 5 },
+                { land: '002-B', area: 500, value: 1300, owner: '張○同', num: 2, den: 5 }
+            ]
+        },
+        merge: {
+            before: [
+                { land: '111', area: 27926, value: 370, owner: '陳○華', num: 1, den: 1 },
+                { land: '222', area: 3581, value: 370, owner: '張○同', num: 1, den: 1 }
+            ],
+            after: [
+                { land: '111', area: 31507, value: 370, owner: '陳○華', num: 88634, den: 100000 },
+                { land: '111', area: 31507, value: 370, owner: '張○同', num: 11366, den: 100000 }
+            ]
+        },
+        partition: {
+            before: [
+                { land: '1205-0003', area: 100, value: 270, owner: '張○', num: 2, den: 5 },
+                { land: '1205-0003', area: 100, value: 270, owner: '陳○寶', num: 3, den: 5 },
+                { land: '1205-0014', area: 200, value: 270, owner: '張○', num: 4, den: 10 },
+                { land: '1205-0014', area: 200, value: 270, owner: '陳○寶', num: 6, den: 10 }
+            ],
+            after: [
+                { land: '1205-0003', area: 100, value: 270, owner: '張○', num: 1, den: 1 },
+                { land: '1205-0014', area: 200, value: 270, owner: '張○', num: 1, den: 10 },
+                { land: '1205-0014', area: 200, value: 270, owner: '陳○寶', num: 9, den: 10 }
+            ]
+        }
+    };
+
+    let currentTab = 'split';
+
+    function switchTab(tab) {
+        currentTab = tab;
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        event.target.classList.add('active');
+
+        // 動態更新前後表格區塊標題文字
+        const baseTitle = tabTitles[tab] || '土地分割';
+        document.querySelector('#title-before').innerText = `${baseTitle}【前】`;
+        document.querySelector('#title-after').innerText = `${baseTitle}【後】`;
+
+        loadSampleData();
+    }
+
+    function createRowHtml(type, data = {}) {
+        const land = data.land || '';
+        const area = data.area !== undefined ? data.area : '';
+        const value = data.value !== undefined ? data.value : '';
+        const owner = data.owner || '';
+        const num = data.num !== undefined ? data.num : 1;
+        const den = data.den !== undefined ? data.den : 1;
+
+        return `
+            <tr>
+                <td><input type="text" class="input-land" value="${land}" oninput="calculate()"></td>
+                <td><input type="number" class="input-area" value="${area}" oninput="calculate()"></td>
+                <td><input type="number" class="input-value" value="${value}" oninput="calculate()"></td>
+                <td><input type="text" class="input-owner" value="${owner}" oninput="calculate()"></td>
+                <td>
+                    <div class="fraction-input">
+                        <input type="number" class="input-num" value="${num}" oninput="calculate()"> / 
+                        <input type="number" class="input-den" value="${den}" oninput="calculate()">
+                    </div>
+                </td>
+                <td class="num-col readonly-cell cell-right-val">0</td>
+                <td style="text-align:center;" class="cell-check">-</td>
+                <td class="col-action" style="text-align:center;"><button class="btn btn-danger" onclick="deleteRow(this)">✕ 刪除</button></td>
+            </tr>
+        `;
+    }
+
+    function addRow(type) {
+        const tbody = document.querySelector(`#table-${type} tbody`);
+        tbody.insertAdjacentHTML('beforeend', createRowHtml(type));
+        calculate();
+    }
+
+    function deleteRow(btn) {
+        const row = btn.closest('tr');
+        row.remove();
+        calculate();
+    }
+
+    function loadSampleData() {
+        const sample = samples[currentTab];
+        const tbodyBefore = document.querySelector('#table-before tbody');
+        const tbodyAfter = document.querySelector('#table-after tbody');
+
+        tbodyBefore.innerHTML = '';
+        tbodyAfter.innerHTML = '';
+
+        sample.before.forEach(data => tbodyBefore.insertAdjacentHTML('beforeend', createRowHtml('before', data)));
+        sample.after.forEach(data => tbodyAfter.insertAdjacentHTML('beforeend', createRowHtml('after', data)));
+
+        calculate();
+    }
+
+    function clearAllData() {
+        document.querySelector('#table-before tbody').innerHTML = '';
+        document.querySelector('#table-after tbody').innerHTML = '';
+        calculate();
+    }
+
+    function calculateTable(type) {
+        const rows = document.querySelectorAll(`#table-${type} tbody tr`);
+        const landGroups = {};
+        const ownerValues = {};
+
+        rows.forEach(row => {
+            const land = row.querySelector('.input-land').value.trim();
+            const area = parseFloat(row.querySelector('.input-area').value) || 0;
+            const val = parseFloat(row.querySelector('.input-value').value) || 0;
+            const owner = row.querySelector('.input-owner').value.trim();
+            const num = parseFloat(row.querySelector('.input-num').value) || 0;
+            const den = parseFloat(row.querySelector('.input-den').value) || 1;
+
+            let rightVal = Math.round(area * val * (num / den));
+            row.querySelector('.cell-right-val').innerText = rightVal.toLocaleString();
+
+            if (owner) {
+                ownerValues[owner] = (ownerValues[owner] || 0) + rightVal;
+            }
+
+            if (land) {
+                if (!landGroups[land]) landGroups[land] = { totalRatio: 0, rows: [] };
+                landGroups[land].totalRatio += (num / den);
+                landGroups[land].rows.push(row);
+            }
+        });
+
+        // 持分檢查 (總合是否等於1)
+        Object.keys(landGroups).forEach(land => {
+            const group = landGroups[land];
+            const isRatioValid = Math.abs(group.totalRatio - 1.0) < 0.0001;
+            group.rows.forEach(row => {
+                const checkCell = row.querySelector('.cell-check');
+                if (isRatioValid) {
+                    checkCell.innerHTML = '<span class="badge-ok">正確</span>';
+                } else {
+                    checkCell.innerHTML = '<span class="badge-err">持分誤</span>';
+                }
+            });
+        });
+
+        return ownerValues;
+    }
+
+    function calculate() {
+        const beforeOwners = calculateTable('before');
+        const afterOwners = calculateTable('after');
+
+        const allOwners = Array.from(new Set([...Object.keys(beforeOwners), ...Object.keys(afterOwners)]));
+        const summaryTbody = document.querySelector('#table-summary tbody');
+        summaryTbody.innerHTML = '';
+
+        allOwners.forEach((owner, idx) => {
+            const valBefore = beforeOwners[owner] || 0;
+            const valAfter = afterOwners[owner] || 0;
+            const diff = valAfter - valBefore;
+
+            // 逾1平方公尺公告現值檢核：暫以簡單邏輯標示 (差額不為0時檢核)
+            let checkResult = '<span class="badge-ok">相符</span>';
+            if (diff !== 0) {
+                checkResult = `<span class="badge-err">差額 ${diff > 0 ? '+' : ''}${diff.toLocaleString()}</span>`;
+            }
+
+            const tr = `
+                <tr>
+                    <td style="text-align: center;">${idx + 1}</td>
+                    <td style="text-align: center;"><strong>${owner}</strong></td>
+                    <td class="num-col">${valBefore.toLocaleString()}</td>
+                    <td class="num-col">${valAfter.toLocaleString()}</td>
+                    <td class="num-col" style="color: ${diff > 0 ? 'green' : (diff < 0 ? 'red' : 'black')}; font-weight: bold;">
+                        ${diff > 0 ? '+' : ''}${diff.toLocaleString()}
+                    </td>
+                    <td style="text-align: center;">${checkResult}</td>
+                </tr>
+            `;
+            summaryTbody.insertAdjacentHTML('beforeend', tr);
+        });
+    }
+
+    // 初始化範例
+    window.onload = loadSampleData;
+</script>
+
+</body>
+</html>
